@@ -306,7 +306,7 @@ peon-ping은 훅을 지원하는 모든 에이전트 기반 IDE에서 동작합�
 | **Claude Code** | 내장 | `curl \| bash` 설치 시 자동 처리 |
 | **Amp** | 어댑터 | `bash ~/.claude/hooks/peon-ping/adapters/amp.sh` (`fswatch` 필요: `brew install fswatch`) ([설정](#amp-설정)) |
 | **Gemini CLI** | 어댑터 | `~/.gemini/settings.json`에 `adapters/gemini.sh` 훅 추가 ([설정](#gemini-cli-설정)) |
-| **GitHub Copilot** | 어댑터 | `.github/hooks/hooks.json`에 `adapters/copilot.sh` 훅 추가 ([설정](#github-copilot-설정)) |
+| **GitHub Copilot** | 어댑터 | 설치 프로그램이 `~/.copilot`을 자동 감지하여 `~/.copilot/hooks/peon-ping.json`에 훅 등록, 또는 수동 생성 ([설정](#github-copilot-설정)) |
 | **OpenAI Codex** | 어댑터 | `~/.codex/config.toml`에 `notify = ["bash", "/절대경로/.claude/hooks/peon-ping/adapters/codex.sh"]` 추가 |
 | **Cursor** | 내장 | `curl \| bash` 또는 `peon-ping-setup`이 자동 감지 후 Cursor 훅 등록 |
 | **OpenCode** | 어댑터 | `curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/adapters/opencode.sh \| bash` ([설정](#opencode-설정)) |
@@ -351,11 +351,17 @@ peon-ping은 훅을 지원하는 모든 에이전트 기반 IDE에서 동작합�
 
 [GitHub Copilot](https://github.com/features/copilot)용 셸 어댑터로, [CESP v1.0](https://github.com/PeonPing/openpeon) 표준을 완전히 준수합니다.
 
-**설정 방법:**
+**자동 설정:** 설치 프로그램이 `~/.copilot`을 자동 감지하여 `~/.copilot/hooks/peon-ping.json`에 훅을 등록합니다 (사용자 레벨, 모든 저장소에 적용). 다음 명령을 실행하세요:
+
+```bash
+curl -fsSL https://peonping.com/install | bash
+```
+
+**수동 설정:**
 
 1. peon-ping이 설치되어 있는지 확인 (`curl -fsSL https://peonping.com/install | bash`)
 
-2. 레포지토리의 기본 브랜치에 `.github/hooks/hooks.json`을 생성:
+2. `~/.copilot/hooks/peon-ping.json`을 생성:
 
    ```json
    {
@@ -389,7 +395,7 @@ peon-ping은 훅을 지원하는 모든 에이전트 기반 IDE에서 동작합�
    }
    ```
 
-3. 커밋 후 기본 브랜치에 병합합니다. 다음 Copilot 에이전트 세션부터 훅이 활성화됩니다.
+3. 다음 Copilot 에이전트 세션부터 훅이 활성화됩니다 — 커밋이나 병합이 필요 없습니다.
 
 **이벤트 매핑:**
 

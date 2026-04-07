@@ -536,7 +536,7 @@ peon-ping はフックをサポートする任意のエージェント型 IDE �
 | **Claude Code** | 組み込み | `curl \| bash` でインストールすればすべて自動 |
 | **Amp** | アダプター | `bash adapters/amp.sh` / `powershell adapters/amp.ps1`（[セットアップ](#amp-セットアップ)） |
 | **Gemini CLI** | アダプター | `adapters/gemini.sh`（Windows では `.ps1`）を指すフックを追加（[セットアップ](#gemini-cli-セットアップ)） |
-| **GitHub Copilot** | アダプター | `.github/hooks/hooks.json` に `adapters/copilot.sh`（または `.ps1`）を指すフックを追加（[セットアップ](#github-copilot-セットアップ)） |
+| **GitHub Copilot** | アダプター | インストーラーが `~/.copilot` を自動検出して `~/.copilot/hooks/peon-ping.json` にフック登録、または手動作成（[セットアップ](#github-copilot-セットアップ)） |
 | **OpenAI Codex** | アダプター | まず peon-ping ランタイムをインストールし、`~/.codex/config.toml` に `adapters/codex.sh`（または `.ps1`）を指す `notify` を追加（[セットアップ](#openai-codex-セットアップ)） |
 | **Cursor** | 組み込み | `curl \| bash`、`peon-ping-setup`、または Windows `install.ps1` が自動検出して登録。Windows では **設定 → 機能 → サードパーティスキル** を有効にして、Cursor が `~/.claude/settings.json` を読み込み SessionStart/Stop サウンドを再生するようにしてください。 |
 | **OpenCode** | アダプター | `bash adapters/opencode.sh` / `powershell adapters/opencode.ps1`（[セットアップ](#opencode-セットアップ)） |
@@ -625,11 +625,17 @@ Homebrew でインストールした場合、ランタイムファイルは `~/.
 
 [GitHub Copilot](https://github.com/features/copilot) 用のシェルアダプター。[CESP v1.0](https://github.com/PeonPing/openpeon) に完全準拠。
 
-**セットアップ：**
+**自動セットアップ：** インストーラーが `~/.copilot` を自動検出し、`~/.copilot/hooks/peon-ping.json` にフックを登録します（ユーザーレベル、すべてのリポジトリに適用）。以下を実行するだけです：
+
+```bash
+curl -fsSL https://peonping.com/install | bash
+```
+
+**手動セットアップ：**
 
 1. peon-ping がインストール済みであることを確認（`curl -fsSL https://peonping.com/install | bash`）
 
-2. リポジトリのデフォルトブランチに `.github/hooks/hooks.json` を作成：
+2. `~/.copilot/hooks/peon-ping.json` を作成：
 
    ```json
    {
@@ -663,7 +669,7 @@ Homebrew でインストールした場合、ランタイムファイルは `~/.
    }
    ```
 
-3. コミットしてデフォルトブランチにマージ。次の Copilot エージェントセッションでフックが有効になります。
+3. 次の Copilot エージェントセッションでフックが有効になります — コミットやマージは不要です。
 
 **イベントマッピング：**
 

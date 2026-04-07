@@ -570,6 +570,7 @@ else
   curl -fsSL "$REPO_BASE/uninstall.sh" -o "$INSTALL_DIR/uninstall.sh"
   mkdir -p "$INSTALL_DIR/adapters"
   curl -fsSL "$REPO_BASE/adapters/codex.sh" -o "$INSTALL_DIR/adapters/codex.sh" 2>/dev/null || true
+  curl -fsSL "$REPO_BASE/adapters/copilot.sh" -o "$INSTALL_DIR/adapters/copilot.sh" 2>/dev/null || true
   curl -fsSL "$REPO_BASE/adapters/cursor.sh" -o "$INSTALL_DIR/adapters/cursor.sh" 2>/dev/null || true
   curl -fsSL "$REPO_BASE/adapters/kiro.sh" -o "$INSTALL_DIR/adapters/kiro.sh" 2>/dev/null || true
   curl -fsSL "$REPO_BASE/adapters/antigravity.sh" -o "$INSTALL_DIR/adapters/antigravity.sh" 2>/dev/null || true
@@ -1269,6 +1270,62 @@ with open(hooks_file, 'w') as f:
     f.write('\n')
 
 events = ['session.start', 'session.end', 'task.complete', 'input.required', 'task.error', 'tool.error', 'user.prompt', 'permission.request', 'compact']
+print('  Hooks registered for: ' + ', '.join(events))
+"
+fi
+
+# --- Auto-detect GitHub Copilot CLI and register hooks ---
+COPILOT_DIR="$HOME/.copilot"
+COPILOT_HOOKS_DIR="$COPILOT_DIR/hooks"
+COPILOT_HOOKS_FILE="$COPILOT_HOOKS_DIR/peon-ping.json"
+
+if [ -d "$COPILOT_DIR" ]; then
+  echo ""
+  echo "Detected GitHub Copilot CLI installation, registering hooks..."
+
+  python3 -c "
+import json, os
+
+hooks_file = '$(py_path "$COPILOT_HOOKS_FILE")'
+adapter_cmd = '$(py_path "$INSTALL_DIR/adapters/copilot.sh")'
+
+# Load or create hooks file
+if os.path.exists(hooks_file):
+    with open(hooks_file) as f:
+        data = json.load(f)
+else:
+    data = {}
+
+if 'version' not in data:
+    data['version'] = 1
+if 'hooks' not in data:
+    data['hooks'] = {}
+
+hooks = data['hooks']
+
+# Events to register with their adapter arguments
+events = ['sessionStart', 'userPromptSubmitted', 'postToolUse', 'errorOccurred']
+
+for event in events:
+    hook_cmd = 'bash ' + adapter_cmd + ' ' + event
+    new_entry = {'type': 'command', 'bash': hook_cmd}
+
+    event_hooks = hooks.get(event, [])
+    # Remove existing peon-ping entries
+    event_hooks = [
+        h for h in event_hooks
+        if 'peon-ping' not in h.get('bash', '') and 'peon-ping' not in h.get('command', '')
+    ]
+    event_hooks.append(new_entry)
+    hooks[event] = event_hooks
+
+data['hooks'] = hooks
+
+os.makedirs(os.path.dirname(hooks_file), exist_ok=True)
+with open(hooks_file, 'w') as f:
+    json.dump(data, f, indent=2)
+    f.write('\n')
+
 print('  Hooks registered for: ' + ', '.join(events))
 "
 fi

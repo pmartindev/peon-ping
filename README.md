@@ -547,7 +547,7 @@ peon-ping works with any agentic IDE that supports hooks. Adapters translate IDE
 | **Claude Code** | Built-in | `curl \| bash` install handles everything |
 | **Amp** | Adapter | `bash adapters/amp.sh` / `powershell adapters/amp.ps1` ([setup](#amp-setup)) |
 | **Gemini CLI** | Adapter | Add hooks pointing to `adapters/gemini.sh` (or `.ps1` on Windows) ([setup](#gemini-cli-setup)) |
-| **GitHub Copilot** | Adapter | Add hooks to `.github/hooks/hooks.json` pointing to `adapters/copilot.sh` (or `.ps1`) ([setup](#github-copilot-setup)) |
+| **GitHub Copilot** | Built-in | Auto-registered by installer if `~/.copilot` exists, or create `~/.copilot/hooks/peon-ping.json` manually ([setup](#github-copilot-setup)) |
 | **OpenAI Codex** | Adapter | Install the peon-ping runtime first, then add `notify` in `~/.codex/config.toml` pointing to `adapters/codex.sh` (or `.ps1`) ([setup](#openai-codex-setup)) |
 | **Cursor** | Built-in | `curl \| bash`, `peon-ping-setup`, or Windows `install.ps1` auto-detect and register hooks. On Windows, enable **Settings → Features → Third-party skills** so Cursor loads `~/.claude/settings.json` for SessionStart/Stop sounds. |
 | **OpenCode** | Adapter | `bash adapters/opencode.sh` / `powershell adapters/opencode.ps1` ([setup](#opencode-setup)) |
@@ -636,11 +636,17 @@ The adapter watches `~/.local/share/amp/threads/` for JSON file changes. When a 
 
 A shell adapter for [GitHub Copilot](https://github.com/features/copilot) with full [CESP v1.0](https://github.com/PeonPing/openpeon) conformance.
 
-**Setup:**
+**Automatic setup:** The installer auto-detects `~/.copilot` and registers hooks in `~/.copilot/hooks/peon-ping.json` (user-level, applies to all repos). Just run:
+
+```bash
+curl -fsSL https://peonping.com/install | bash
+```
+
+**Manual setup:**
 
 1. Ensure peon-ping is installed (`curl -fsSL https://peonping.com/install | bash`)
 
-2. Create `.github/hooks/hooks.json` in your repository (on the default branch):
+2. Create `~/.copilot/hooks/peon-ping.json`:
 
    ```json
    {
@@ -674,7 +680,7 @@ A shell adapter for [GitHub Copilot](https://github.com/features/copilot) with f
    }
    ```
 
-3. Commit and merge to your default branch. Hooks will activate on your next Copilot agent session.
+3. Hooks activate on your next Copilot agent session — no commit or merge required.
 
 **Event mapping:**
 

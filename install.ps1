@@ -3006,6 +3006,65 @@ if (Test-Path $DeepagentsDir) {
     Write-Host "  Hooks registered for: $($daEvents -join ', ')" -ForegroundColor Green
 }
 
+# --- Auto-detect GitHub Copilot CLI and register hooks ---
+$CopilotDir = Join-Path $env:USERPROFILE ".copilot"
+$CopilotHooksDir = Join-Path $CopilotDir "hooks"
+$CopilotHooksFile = Join-Path $CopilotHooksDir "peon-ping.json"
+
+if (Test-Path $CopilotDir) {
+    Write-Host ""
+    Write-Host "Detected GitHub Copilot CLI installation, registering hooks..."
+
+    $adapterPath = Join-Path $InstallDir "adapters" "copilot.ps1"
+
+    # Load or create hooks file
+    $copilotData = $null
+    if (Test-Path $CopilotHooksFile) {
+        try {
+            $copilotData = Get-Content $CopilotHooksFile -Raw | ConvertFrom-Json
+        } catch { $copilotData = $null }
+    }
+    if (-not $copilotData) {
+        $copilotData = [PSCustomObject]@{ version = 1; hooks = [PSCustomObject]@{} }
+    }
+    if (-not $copilotData.version) {
+        $copilotData | Add-Member -NotePropertyName "version" -NotePropertyValue 1 -Force
+    }
+    if (-not $copilotData.hooks) {
+        $copilotData | Add-Member -NotePropertyName "hooks" -NotePropertyValue ([PSCustomObject]@{}) -Force
+    }
+
+    # Events to register
+    $copilotEvents = @("sessionStart", "userPromptSubmitted", "postToolUse", "errorOccurred")
+
+    foreach ($evt in $copilotEvents) {
+        $hookCmd = "powershell -NoProfile -File `"$adapterPath`" $evt"
+        $newEntry = [PSCustomObject]@{ type = "command"; command = $hookCmd }
+
+        # Get existing hooks for this event, filter out peon-ping entries
+        $existing = @()
+        if ($copilotData.hooks.PSObject.Properties[$evt]) {
+            $existing = @($copilotData.hooks.$evt | Where-Object {
+                $cmd = if ($_.command) { $_.command } else { "" }
+                $cmd -notmatch "peon-ping"
+            })
+        }
+        $existing = @($existing) + @($newEntry)
+
+        # Set the event hooks
+        if ($copilotData.hooks.PSObject.Properties[$evt]) {
+            $copilotData.hooks.$evt = $existing
+        } else {
+            $copilotData.hooks | Add-Member -NotePropertyName $evt -NotePropertyValue $existing -Force
+        }
+    }
+
+    # Ensure directory exists and write
+    New-Item -ItemType Directory -Path $CopilotHooksDir -Force | Out-Null
+    $copilotData | ConvertTo-Json -Depth 10 | Set-Content $CopilotHooksFile -Encoding UTF8
+    Write-Host "  Hooks registered for: $($copilotEvents -join ', ')" -ForegroundColor Green
+}
+
 # --- Install skills ---
 Write-Host ""
 Write-Host "Installing skills..."

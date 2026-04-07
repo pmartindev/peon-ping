@@ -1,7 +1,8 @@
-# peon-ping adapter for GitHub Copilot (Windows)
+# peon-ping adapter for GitHub Copilot CLI (Windows)
 # Translates GitHub Copilot hook events into peon.ps1 stdin JSON
 #
-# Setup: Add to .github/hooks/hooks.json in your repository:
+# Setup (user-level — applies to all repos):
+#   Create ~/.copilot/hooks/peon-ping.json:
 #   {
 #     "version": 1,
 #     "hooks": {
@@ -19,6 +20,8 @@
 #       ]
 #     }
 #   }
+#
+# The installer auto-creates this file when ~/.copilot exists.
 
 param(
     [string]$Event = "sessionStart"

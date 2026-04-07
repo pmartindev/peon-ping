@@ -539,7 +539,7 @@ peon-ping 适用于任何支持钩子的代理式 IDE。适配器将 IDE 特定�
 | **Claude Code** | 内置 | `curl \| bash` 安装会自动处理 |
 | **Amp** | 适配器 | `bash adapters/amp.sh` / `powershell adapters/amp.ps1`（[设置](#amp-设置)） |
 | **Gemini CLI** | 适配器 | 添加指向 `adapters/gemini.sh`（Windows 用 `.ps1`）的钩子（[设置](#gemini-cli-设置)） |
-| **GitHub Copilot** | 适配器 | 在 `.github/hooks/hooks.json` 中添加指向 `adapters/copilot.sh`（或 `.ps1`）的钩子（[设置](#github-copilot-设置)） |
+| **GitHub Copilot** | 适配器 | 安装程序自动检测 `~/.copilot` 并注册钩子到 `~/.copilot/hooks/peon-ping.json`，或手动创建（[设置](#github-copilot-设置)） |
 | **OpenAI Codex** | 适配器 | 先安装 peon-ping 运行时，然后在 `~/.codex/config.toml` 中添加指向 `adapters/codex.sh`（或 `.ps1`）的 `notify` 条目（[设置](#openai-codex-设置)） |
 | **Cursor** | 内置 | `curl \| bash`、`peon-ping-setup` 或 Windows `install.ps1` 自动检测并注册钩子。在 Windows 上，请在 **设置 → 功能 → 第三方技能** 中启用，以便 Cursor 加载 `~/.claude/settings.json` 以播放 SessionStart/Stop 音效。 |
 | **OpenCode** | 适配器 | `bash adapters/opencode.sh` / `powershell adapters/opencode.ps1`（[设置](#opencode-设置)） |
@@ -628,11 +628,17 @@ Codex 适配器要求 peon-ping 运行时位于 `~/.claude/hooks/peon-ping/`，�
 
 [GitHub Copilot](https://github.com/features/copilot) 的 shell 适配器，完全符合 [CESP v1.0](https://github.com/PeonPing/openpeon) 规范。
 
-**设置步骤：**
+**自动设置：** 安装程序自动检测 `~/.copilot` 并在 `~/.copilot/hooks/peon-ping.json` 中注册钩子（用户级别，适用于所有仓库）。只需运行：
+
+```bash
+curl -fsSL https://peonping.com/install | bash
+```
+
+**手动设置：**
 
 1. 确保已安装 peon-ping（`curl -fsSL https://peonping.com/install | bash`）
 
-2. 在仓库的默认分支中创建 `.github/hooks/hooks.json`：
+2. 创建 `~/.copilot/hooks/peon-ping.json`：
 
    ```json
    {
@@ -666,7 +672,7 @@ Codex 适配器要求 peon-ping 运行时位于 `~/.claude/hooks/peon-ping/`，�
    }
    ```
 
-3. 提交并合并到默认分支。下次 Copilot agent 会话时钩子将激活。
+3. 下次 Copilot agent 会话时钩子将激活——无需提交或合并。
 
 **事件映射：**
 
