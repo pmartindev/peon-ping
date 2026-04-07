@@ -1304,9 +1304,9 @@ if 'hooks' not in data:
 hooks = data['hooks']
 
 # Events to register with their adapter arguments
-events = ['sessionStart', 'userPromptSubmitted', 'postToolUse', 'errorOccurred']
+copilot_events = ['sessionStart', 'userPromptSubmitted', 'postToolUse', 'errorOccurred']
 
-for event in events:
+for event in copilot_events:
     hook_cmd = 'bash ' + adapter_cmd + ' ' + event
     new_entry = {'type': 'command', 'bash': hook_cmd}
 
@@ -1326,7 +1326,7 @@ with open(hooks_file, 'w') as f:
     json.dump(data, f, indent=2)
     f.write('\n')
 
-print('  Hooks registered for: ' + ', '.join(events))
+print('  Hooks registered for: ' + ', '.join(copilot_events))
 "
 fi
 
