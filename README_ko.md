@@ -306,7 +306,7 @@ peon-ping은 훅을 지원하는 모든 에이전트 기반 IDE에서 동작합�
 | **Claude Code** | 내장 | `curl \| bash` 설치 시 자동 처리 |
 | **Amp** | 어댑터 | `bash ~/.claude/hooks/peon-ping/adapters/amp.sh` (`fswatch` 필요: `brew install fswatch`) ([설정](#amp-설정)) |
 | **Gemini CLI** | 어댑터 | `~/.gemini/settings.json`에 `adapters/gemini.sh` 훅 추가 ([설정](#gemini-cli-설정)) |
-| **GitHub Copilot** | 어댑터 | `.github/hooks/hooks.json`에 `adapters/copilot.sh` 훅 추가 ([설정](#github-copilot-설정)) |
+| **GitHub Copilot** | 어댑터 | 설치 시 `~/.copilot/hooks/peon-ping.json` 자동 등록, 또는 `.github/hooks/`에 레포별 훅 추가 ([설정](#github-copilot-설정)) |
 | **OpenAI Codex** | 어댑터 | `~/.codex/config.toml`에 `notify = ["bash", "/절대경로/.claude/hooks/peon-ping/adapters/codex.sh"]` 추가 |
 | **Cursor** | 내장 | `curl \| bash` 또는 `peon-ping-setup`이 자동 감지 후 Cursor 훅 등록 |
 | **OpenCode** | 어댑터 | `curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/adapters/opencode.sh \| bash` ([설정](#opencode-설정)) |
@@ -349,64 +349,46 @@ peon-ping은 훅을 지원하는 모든 에이전트 기반 IDE에서 동작합�
 
 ### GitHub Copilot 설정
 
-[GitHub Copilot](https://github.com/features/copilot)용 셸 어댑터로, [CESP v1.0](https://github.com/PeonPing/openpeon) 표준을 완전히 준수합니다.
+[GitHub Copilot](https://github.com/features/copilot) / Copilot CLI용 훅 어댑터이며 [CESP v1.0](https://github.com/PeonPing/openpeon) 표준을 완전히 준수합니다.
 
-**설정 방법:**
+**권장 설정:**
 
-1. peon-ping이 설치되어 있는지 확인 (`curl -fsSL https://peonping.com/install | bash`)
+1. peon-ping 설치:
 
-2. 레포지토리의 기본 브랜치에 `.github/hooks/hooks.json`을 생성:
-
-   ```json
-   {
-     "version": 1,
-     "hooks": {
-       "sessionStart": [
-         {
-           "type": "command",
-           "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh sessionStart"
-         }
-       ],
-       "userPromptSubmitted": [
-         {
-           "type": "command",
-           "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh userPromptSubmitted"
-         }
-       ],
-       "postToolUse": [
-         {
-           "type": "command",
-           "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh postToolUse"
-         }
-       ],
-       "errorOccurred": [
-         {
-           "type": "command",
-           "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh errorOccurred"
-         }
-       ]
-     }
-   }
+   ```bash
+   curl -fsSL https://peonping.com/install | bash
    ```
 
-3. 커밋 후 기본 브랜치에 병합합니다. 다음 Copilot 에이전트 세션부터 훅이 활성화됩니다.
+2. Copilot CLI가 이미 설치되어 `~/.copilot/`가 있으면 설치 프로그램이 다음 파일을 자동 생성합니다:
+
+   ```text
+   ~/.copilot/hooks/peon-ping.json
+   ```
+
+3. Copilot CLI를 다시 시작하고 새 세션을 시작합니다.
+
+**수동 레포지토리 설정(공식 hooks 경로):**
+
+원한다면 `.github/hooks/peon-ping.json`을 기본 브랜치에 커밋할 수도 있습니다. `sessionStart`, `userPromptSubmitted`, `preToolUse`, `postToolUse`, `agentStop`, `subagentStop`, `errorOccurred`를 `adapters/copilot.sh`(Windows는 `.ps1`)로 연결하세요.
 
 **이벤트 매핑:**
 
-- `sessionStart` → 인사 사운드 (*"Ready to work?"*, *"Yes?"*)
-- `userPromptSubmitted` → 첫 프롬프트 = 인사, 이후 = 스팸 감지
-- `postToolUse` → 완료 사운드 (*"Work, work."*, *"Job's done!"*)
-- `errorOccurred` → 에러 사운드 (*"I can't do that."*)
-- `preToolUse` → 건너뜀 (너무 시끄러움)
-- `sessionEnd` → 사운드 없음 (session.end 미구현)
+- `sessionStart` → 인사 사운드
+- `userPromptSubmitted` → 첫 프롬프트는 인사, 이후는 스팸 감지
+- `agentStop` → 완료 사운드
+- `subagentStop` → 서브에이전트 완료 처리
+- `postToolUse` → 도구 실패 시에만 에러 사운드 전달
+- `errorOccurred` → 에러 사운드
+- `preToolUse` → 명시적 권한 프롬프트가 아니면 건너뜀
+- `sessionEnd` → 사운드 없음
 
 **기능:**
 
-- **사운드 재생** — `afplay` (macOS), `pw-play`/`paplay`/`ffplay` (Linux) — 셸 훅과 동일한 우선순위
-- **CESP 이벤트 매핑** — GitHub Copilot 훅을 표준 CESP 카테고리로 매핑 (`session.start`, `task.complete`, `task.error`, `user.spam`)
-- **데스크톱 알림** — 기본값은 대형 오버레이 배너, 또는 시스템 알림
-- **스팸 감지** — 10초 내 3회 이상 빠른 프롬프트 감지 시 `user.spam` 음성 트리거
-- **세션 추적** — Copilot sessionId별 독립 세션 마커
+- **`jq` 불필요** — 다른 셸 어댑터처럼 내장 `python3`로 JSON 파싱
+- **CESP 이벤트 매핑** — `session.start`, `task.complete`, `task.error`, `user.spam`에 매핑
+- **데스크톱 알림**
+- **스팸 감지**
+- **세션 추적** — Copilot `sessionId`별 독립 세션 마커
 
 ### OpenCode 설정
 

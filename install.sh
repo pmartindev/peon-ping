@@ -1216,6 +1216,64 @@ print('Cursor beforeSubmitPrompt hooks registered for /peon-ping-use and /peon-p
 "
 fi
 
+# --- Auto-detect GitHub Copilot CLI and register hooks ---
+COPILOT_DIR="$HOME/.copilot"
+COPILOT_HOOKS_FILE="$COPILOT_DIR/hooks/peon-ping.json"
+
+if [ -d "$COPILOT_DIR" ]; then
+  echo ""
+  echo "Detected GitHub Copilot installation, registering hooks..."
+
+  python3 -c "
+import json, os
+
+hooks_file = '$(py_path "$COPILOT_HOOKS_FILE")'
+adapter_path = '$(py_path "$INSTALL_DIR/adapters/copilot.sh")'
+
+if os.path.exists(hooks_file):
+    try:
+        with open(hooks_file) as f:
+            data = json.load(f)
+    except Exception:
+        data = {}
+else:
+    data = {}
+
+data['version'] = 1
+hooks = data.get('hooks')
+if not isinstance(hooks, dict):
+    hooks = {}
+
+events = [
+    'sessionStart',
+    'sessionEnd',
+    'userPromptSubmitted',
+    'preToolUse',
+    'postToolUse',
+    'agentStop',
+    'subagentStop',
+    'errorOccurred',
+]
+
+for event in events:
+    hooks[event] = [{
+        'type': 'command',
+        'bash': f'bash \"{adapter_path}\" {event}',
+        'timeoutSec': 5,
+    }]
+
+data['hooks'] = hooks
+
+os.makedirs(os.path.dirname(hooks_file), exist_ok=True)
+with open(hooks_file, 'w') as f:
+    json.dump(data, f, indent=2)
+    f.write('\n')
+
+print('  Hooks registered in ' + hooks_file)
+print('  Events: ' + ', '.join(events))
+" || true
+fi
+
 # --- Register event hooks for Rovo Dev CLI if ~/.rovodev exists ---
 if [ -d "$HOME/.rovodev" ]; then
   echo ""

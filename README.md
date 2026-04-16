@@ -616,7 +616,7 @@ peon-ping works with any agentic IDE that supports hooks. Adapters translate IDE
 | **Claude Code** | Built-in | `curl \| bash` install handles everything |
 | **Amp** | Adapter | `bash adapters/amp.sh` / `powershell adapters/amp.ps1` ([setup](#amp-setup)) |
 | **Gemini CLI** | Adapter | Add hooks pointing to `adapters/gemini.sh` (or `.ps1` on Windows) ([setup](#gemini-cli-setup)) |
-| **GitHub Copilot** | Adapter | Add hooks to `.github/hooks/hooks.json` pointing to `adapters/copilot.sh` (or `.ps1`) ([setup](#github-copilot-setup)) |
+| **GitHub Copilot** | Adapter | Auto-registers `~/.copilot/hooks/peon-ping.json` on install, or add repo hooks under `.github/hooks/` ([setup](#github-copilot-setup)) |
 | **OpenAI Codex** | Adapter | Install the peon-ping runtime first, then add `notify` in `~/.codex/config.toml` pointing to `adapters/codex.sh` (or `.ps1`) ([setup](#openai-codex-setup)) |
 | **Cursor** | Built-in | `curl \| bash`, `peon-ping-setup`, or Windows `install.ps1` auto-detect and register hooks. On Windows, enable **Settings → Features → Third-party skills** so Cursor loads `~/.claude/settings.json` for SessionStart/Stop sounds. |
 | **OpenCode** | Adapter | `bash adapters/opencode.sh` / `powershell adapters/opencode.ps1` ([setup](#opencode-setup)) |
@@ -703,64 +703,103 @@ The adapter watches `~/.local/share/amp/threads/` for JSON file changes. When a 
 
 ### GitHub Copilot setup
 
-A shell adapter for [GitHub Copilot](https://github.com/features/copilot) with full [CESP v1.0](https://github.com/PeonPing/openpeon) conformance.
+A hook adapter for [GitHub Copilot](https://github.com/features/copilot) / Copilot CLI with full [CESP v1.0](https://github.com/PeonPing/openpeon) conformance.
 
-**Setup:**
+**Recommended setup:**
 
-1. Ensure peon-ping is installed (`curl -fsSL https://peonping.com/install | bash`)
+1. Install peon-ping:
 
-2. Create `.github/hooks/hooks.json` in your repository (on the default branch):
-
-   ```json
-   {
-     "version": 1,
-     "hooks": {
-       "sessionStart": [
-         {
-           "type": "command",
-           "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh sessionStart"
-         }
-       ],
-       "userPromptSubmitted": [
-         {
-           "type": "command",
-           "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh userPromptSubmitted"
-         }
-       ],
-       "postToolUse": [
-         {
-           "type": "command",
-           "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh postToolUse"
-         }
-       ],
-       "errorOccurred": [
-         {
-           "type": "command",
-           "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh errorOccurred"
-         }
-       ]
-     }
-   }
+   ```bash
+   curl -fsSL https://peonping.com/install | bash
    ```
 
-3. Commit and merge to your default branch. Hooks will activate on your next Copilot agent session.
+2. If Copilot CLI is already installed and `~/.copilot/` exists, the installer now auto-creates:
+
+   ```text
+   ~/.copilot/hooks/peon-ping.json
+   ```
+
+3. Restart Copilot CLI and start a new session.
+
+**Manual repo-level setup (official hooks path):**
+
+If you prefer repository-scoped hooks, commit `.github/hooks/peon-ping.json` on your default branch:
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh sessionStart",
+        "timeoutSec": 5
+      }
+    ],
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh userPromptSubmitted",
+        "timeoutSec": 5
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh preToolUse",
+        "timeoutSec": 5
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh postToolUse",
+        "timeoutSec": 5
+      }
+    ],
+    "agentStop": [
+      {
+        "type": "command",
+        "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh agentStop",
+        "timeoutSec": 5
+      }
+    ],
+    "subagentStop": [
+      {
+        "type": "command",
+        "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh subagentStop",
+        "timeoutSec": 5
+      }
+    ],
+    "errorOccurred": [
+      {
+        "type": "command",
+        "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh errorOccurred",
+        "timeoutSec": 5
+      }
+    ]
+  }
+}
+```
 
 **Event mapping:**
 
 - `sessionStart` → Greeting sound (*"Ready to work?"*, *"Yes?"*)
-- `userPromptSubmitted` → First prompt = greeting, subsequent = spam detection
-- `postToolUse` → Completion sound (*"Work, work."*, *"Job's done!"*)
+- `userPromptSubmitted` → First prompt = greeting, later prompts = spam detection
+- `agentStop` → Completion sound (*"Work, work."*, *"Job's done!"*)
+- `subagentStop` → Subagent-aware completion handling
+- `postToolUse` → Only forwards failed tool executions as error sounds
 - `errorOccurred` → Error sound (*"I can't do that."*)
-- `preToolUse` → Skipped (too noisy)
-- `sessionEnd` → No sound (session.end not yet implemented)
+- `preToolUse` → Only used for explicit permission prompts; otherwise skipped to avoid noise
+- `sessionEnd` → No sound
 
 **Features:**
 
-- **Sound playback** via `afplay` (macOS), `pw-play`/`paplay`/`ffplay` (Linux) — same priority chain as the shell hook
-- **CESP event mapping** — GitHub Copilot hooks map to standard CESP categories (`session.start`, `task.complete`, `task.error`, `user.spam`)
+- **No `jq` dependency** — the adapter uses embedded `python3` parsing like the other shell adapters
+- **CESP event mapping** — Copilot hooks map to standard categories (`session.start`, `task.complete`, `task.error`, `user.spam`)
 - **Desktop notifications** — large overlay banners by default, or standard notifications
 - **Spam detection** — detects 3+ rapid prompts within 10 seconds, triggers `user.spam` voice lines
-- **Session tracking** — separate session markers per Copilot sessionId
+- **Session tracking** — separate session markers per Copilot `sessionId`
 
 ### OpenCode setup
 

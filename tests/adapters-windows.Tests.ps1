@@ -180,8 +180,13 @@ Describe "Category A: Copilot Adapter" {
         $script:copilotContent | Should -Match '"sessionStart"\s*\{[^}]*\$mapped = "SessionStart"'
     }
 
-    It "maps postToolUse to Stop" {
-        $script:copilotContent | Should -Match '"postToolUse"\s*\{[^}]*\$mapped = "Stop"'
+    It "maps agentStop to Stop" {
+        $script:copilotContent | Should -Match '"agentStop"\s*\{[^}]*\$mapped = "Stop"'
+    }
+
+    It "maps failed postToolUse to PostToolUseFailure" {
+        $script:copilotContent | Should -Match '"postToolUse"'
+        $script:copilotContent | Should -Match '\$mapped = "PostToolUseFailure"'
     }
 
     It "maps errorOccurred to PostToolUseFailure" {
@@ -679,6 +684,12 @@ Describe "install.ps1 Adapter Installation" {
     It "handles missing Claude Code gracefully" {
         $script:installContent | Should -Match 'ClaudeCodeDetected'
         $script:installContent | Should -Match 'Skipping Claude Code hook registration'
+    }
+
+    It "registers GitHub Copilot hooks when .copilot exists" {
+        $script:installContent | Should -Match '\.copilot'
+        $script:installContent | Should -Match 'peon-ping\.json'
+        $script:installContent | Should -Match 'agentStop'
     }
 
     It "installs win-notify.ps1 alongside win-play.ps1" {

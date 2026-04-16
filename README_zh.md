@@ -540,7 +540,7 @@ peon-ping 适用于任何支持钩子的代理式 IDE。适配器将 IDE 特定�
 | **Claude Code** | 内置 | `curl \| bash` 安装会自动处理 |
 | **Amp** | 适配器 | `bash adapters/amp.sh` / `powershell adapters/amp.ps1`（[设置](#amp-设置)） |
 | **Gemini CLI** | 适配器 | 添加指向 `adapters/gemini.sh`（Windows 用 `.ps1`）的钩子（[设置](#gemini-cli-设置)） |
-| **GitHub Copilot** | 适配器 | 在 `.github/hooks/hooks.json` 中添加指向 `adapters/copilot.sh`（或 `.ps1`）的钩子（[设置](#github-copilot-设置)） |
+| **GitHub Copilot** | 适配器 | 安装时会自动注册 `~/.copilot/hooks/peon-ping.json`，或在 `.github/hooks/` 下添加仓库级钩子（[设置](#github-copilot-设置)） |
 | **OpenAI Codex** | 适配器 | 先安装 peon-ping 运行时，然后在 `~/.codex/config.toml` 中添加指向 `adapters/codex.sh`（或 `.ps1`）的 `notify` 条目（[设置](#openai-codex-设置)） |
 | **Cursor** | 内置 | `curl \| bash`、`peon-ping-setup` 或 Windows `install.ps1` 自动检测并注册钩子。在 Windows 上，请在 **设置 → 功能 → 第三方技能** 中启用，以便 Cursor 加载 `~/.claude/settings.json` 以播放 SessionStart/Stop 音效。 |
 | **OpenCode** | 适配器 | `bash adapters/opencode.sh` / `powershell adapters/opencode.ps1`（[设置](#opencode-设置)） |
@@ -627,64 +627,103 @@ Codex 适配器要求 peon-ping 运行时位于 `~/.claude/hooks/peon-ping/`，�
 
 ### GitHub Copilot 设置
 
-[GitHub Copilot](https://github.com/features/copilot) 的 shell 适配器，完全符合 [CESP v1.0](https://github.com/PeonPing/openpeon) 规范。
+[GitHub Copilot](https://github.com/features/copilot) / Copilot CLI 的钩子适配器，完全符合 [CESP v1.0](https://github.com/PeonPing/openpeon) 规范。
 
-**设置步骤：**
+**推荐设置：**
 
-1. 确保已安装 peon-ping（`curl -fsSL https://peonping.com/install | bash`）
+1. 安装 peon-ping：
 
-2. 在仓库的默认分支中创建 `.github/hooks/hooks.json`：
-
-   ```json
-   {
-     "version": 1,
-     "hooks": {
-       "sessionStart": [
-         {
-           "type": "command",
-           "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh sessionStart"
-         }
-       ],
-       "userPromptSubmitted": [
-         {
-           "type": "command",
-           "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh userPromptSubmitted"
-         }
-       ],
-       "postToolUse": [
-         {
-           "type": "command",
-           "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh postToolUse"
-         }
-       ],
-       "errorOccurred": [
-         {
-           "type": "command",
-           "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh errorOccurred"
-         }
-       ]
-     }
-   }
+   ```bash
+   curl -fsSL https://peonping.com/install | bash
    ```
 
-3. 提交并合并到默认分支。下次 Copilot agent 会话时钩子将激活。
+2. 如果已安装 Copilot CLI 且存在 `~/.copilot/`，安装程序会自动创建：
+
+   ```text
+   ~/.copilot/hooks/peon-ping.json
+   ```
+
+3. 重启 Copilot CLI，并开始一个新会话。
+
+**手动仓库级设置（官方 hooks 路径）：**
+
+如果你更喜欢按仓库配置，请在默认分支提交 `.github/hooks/peon-ping.json`：
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh sessionStart",
+        "timeoutSec": 5
+      }
+    ],
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh userPromptSubmitted",
+        "timeoutSec": 5
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh preToolUse",
+        "timeoutSec": 5
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh postToolUse",
+        "timeoutSec": 5
+      }
+    ],
+    "agentStop": [
+      {
+        "type": "command",
+        "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh agentStop",
+        "timeoutSec": 5
+      }
+    ],
+    "subagentStop": [
+      {
+        "type": "command",
+        "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh subagentStop",
+        "timeoutSec": 5
+      }
+    ],
+    "errorOccurred": [
+      {
+        "type": "command",
+        "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh errorOccurred",
+        "timeoutSec": 5
+      }
+    ]
+  }
+}
+```
 
 **事件映射：**
 
 - `sessionStart` → 问候音效（*"Ready to work?"*、*"Yes?"*）
-- `userPromptSubmitted` → 首次提示 = 问候，后续 = 垃圾信息检测
-- `postToolUse` → 完成音效（*"Work, work."*、*"Job's done!"*）
+- `userPromptSubmitted` → 首次提示 = 问候，后续提示 = 垃圾信息检测
+- `agentStop` → 完成音效（*"Work, work."*、*"Job's done!"*）
+- `subagentStop` → 子代理完成处理
+- `postToolUse` → 仅在工具失败时转发为错误音效
 - `errorOccurred` → 错误音效（*"I can't do that."*）
-- `preToolUse` → 跳过（过于嘈杂）
-- `sessionEnd` → 无音效（session.end 尚未实现）
+- `preToolUse` → 仅用于显式权限提示，否则跳过以避免噪音
+- `sessionEnd` → 无音效
 
 **功能：**
 
-- **音频播放** 通过 `afplay`（macOS）、`pw-play`/`paplay`/`ffplay`（Linux）—— 与 shell 钩子相同的优先级链
+- **无需 `jq` 依赖** —— 与其他 shell 适配器一致，使用内嵌 `python3` 解析 JSON
 - **CESP 事件映射** —— GitHub Copilot 钩子映射到标准 CESP 分类（`session.start`、`task.complete`、`task.error`、`user.spam`）
 - **桌面通知** —— 默认使用大型覆盖横幅，或标准通知
 - **垃圾信息检测** —— 检测 10 秒内 3 次以上快速提示，触发 `user.spam` 语音
-- **会话跟踪** —— 每个 Copilot sessionId 独立的会话标记
+- **会话跟踪** —— 每个 Copilot `sessionId` 独立的会话标记
 
 ### OpenCode 设置
 

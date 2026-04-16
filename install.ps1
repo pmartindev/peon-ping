@@ -2988,6 +2988,60 @@ if (Test-Path $CursorDir) {
     Write-Host "  Cursor beforeSubmitPrompt hook registered" -ForegroundColor Green
 }
 
+# --- Register GitHub Copilot hooks if %USERPROFILE%\.copilot exists ---
+$CopilotDir = Join-Path $env:USERPROFILE ".copilot"
+$CopilotHooksFile = Join-Path $CopilotDir "hooks\peon-ping.json"
+
+if (Test-Path $CopilotDir) {
+    Write-Host ""
+    Write-Host "Detected GitHub Copilot installation, registering hooks..."
+
+    $copilotData = [PSCustomObject]@{
+        version = 1
+        hooks = [PSCustomObject]@{}
+    }
+
+    if (Test-Path $CopilotHooksFile) {
+        try {
+            $copilotData = Get-Content $CopilotHooksFile -Raw | ConvertFrom-Json
+        } catch {
+            $copilotData = [PSCustomObject]@{
+                version = 1
+                hooks = [PSCustomObject]@{}
+            }
+        }
+    }
+
+    if (-not ($copilotData.PSObject.Properties.Name -contains "version")) {
+        $copilotData | Add-Member -NotePropertyName "version" -NotePropertyValue 1 -Force
+    } else {
+        $copilotData.version = 1
+    }
+    if (-not ($copilotData.PSObject.Properties.Name -contains "hooks") -or -not $copilotData.hooks) {
+        $copilotData | Add-Member -NotePropertyName "hooks" -NotePropertyValue ([PSCustomObject]@{}) -Force
+    }
+
+    $copilotAdapter = Join-Path $InstallDir "adapters\copilot.ps1"
+    $copilotEvents = @("sessionStart", "sessionEnd", "userPromptSubmitted", "preToolUse", "postToolUse", "agentStop", "subagentStop", "errorOccurred")
+
+    foreach ($evt in $copilotEvents) {
+        $copilotHook = [PSCustomObject]@{
+            type = "command"
+            powershell = "powershell -NoProfile -NonInteractive -File `"$copilotAdapter`" $evt"
+            timeoutSec = 5
+        }
+        if ($copilotData.hooks.PSObject.Properties.Name -contains $evt) {
+            $copilotData.hooks.$evt = @($copilotHook)
+        } else {
+            $copilotData.hooks | Add-Member -NotePropertyName $evt -NotePropertyValue @($copilotHook)
+        }
+    }
+
+    New-Item -ItemType Directory -Path (Split-Path $CopilotHooksFile -Parent) -Force | Out-Null
+    $copilotData | ConvertTo-Json -Depth 10 | Set-Content $CopilotHooksFile -Encoding UTF8
+    Write-Host "  Copilot hooks registered in $CopilotHooksFile" -ForegroundColor Green
+}
+
 # --- Auto-detect deepagents-cli and register hooks ---
 $DeepagentsDir = Join-Path $env:USERPROFILE ".deepagents"
 $DeepagentsHooksFile = Join-Path $DeepagentsDir "hooks.json"

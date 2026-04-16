@@ -135,6 +135,25 @@ print('OK')
 "
 }
 
+@test "fresh install auto-registers GitHub Copilot hooks when ~/.copilot exists" {
+  mkdir -p "$TEST_HOME/.copilot"
+  bash "$CLONE_DIR/install.sh"
+  [ -f "$TEST_HOME/.copilot/hooks/peon-ping.json" ]
+
+  /usr/bin/python3 -c "
+import json
+data = json.load(open('$TEST_HOME/.copilot/hooks/peon-ping.json'))
+hooks = data.get('hooks', {})
+for event in ['sessionStart', 'sessionEnd', 'userPromptSubmitted', 'preToolUse', 'postToolUse', 'agentStop', 'subagentStop', 'errorOccurred']:
+    assert event in hooks, f'{event} not in Copilot hooks'
+    entries = hooks[event]
+    assert isinstance(entries, list) and entries, f'{event} missing hook entries'
+    cmd = entries[0].get('bash', '')
+    assert 'adapters/copilot.sh' in cmd, f'copilot adapter missing for {event}: {cmd}'
+print('OK')
+"
+}
+
 @test "fresh install creates VERSION file" {
   bash "$CLONE_DIR/install.sh"
   [ -f "$INSTALL_DIR/VERSION" ]

@@ -21,7 +21,7 @@ teardown() {
 run_copilot() {
   local event="$1"
   # Note: avoid ${2:-{}} — bash closes the expansion at the first }, leaving a
-  # trailing literal } that makes the JSON malformed and causes jq to exit 5.
+  # trailing literal } that makes the JSON malformed.
   local json="${2-}"
   if [ -z "$json" ]; then json="{}"; fi
   export PEON_TEST=1
@@ -53,8 +53,8 @@ run_copilot() {
   [[ "$sound" == *"/packs/peon/sounds/Hello"* ]]
 }
 
-@test "postToolUse maps to Stop and plays completion sound" {
-  run_copilot postToolUse '{"sessionId":"test-123","cwd":"/tmp"}'
+@test "agentStop maps to Stop and plays completion sound" {
+  run_copilot agentStop '{"sessionId":"test-123","cwd":"/tmp"}'
   [ "$COPILOT_EXIT" -eq 0 ]
   afplay_was_called
   sound=$(afplay_sound)
@@ -63,6 +63,14 @@ run_copilot() {
 
 @test "errorOccurred maps to PostToolUseFailure and plays error sound" {
   run_copilot errorOccurred '{"sessionId":"test-123","cwd":"/tmp"}'
+  [ "$COPILOT_EXIT" -eq 0 ]
+  afplay_was_called
+  sound=$(afplay_sound)
+  [[ "$sound" == *"/packs/peon/sounds/Error"* ]]
+}
+
+@test "failed postToolUse maps to PostToolUseFailure and plays error sound" {
+  run_copilot postToolUse '{"sessionId":"test-123","cwd":"/tmp","exitCode":1,"toolName":"bash","message":"command failed"}'
   [ "$COPILOT_EXIT" -eq 0 ]
   afplay_was_called
   sound=$(afplay_sound)
@@ -99,6 +107,12 @@ run_copilot() {
 
 @test "preToolUse exits gracefully without sound (too noisy)" {
   run_copilot preToolUse '{"sessionId":"test-123","cwd":"/tmp","toolName":"bash"}'
+  [ "$COPILOT_EXIT" -eq 0 ]
+  ! afplay_was_called
+}
+
+@test "successful postToolUse exits gracefully without sound" {
+  run_copilot postToolUse '{"sessionId":"test-123","cwd":"/tmp","exitCode":0,"toolName":"bash"}'
   [ "$COPILOT_EXIT" -eq 0 ]
   ! afplay_was_called
 }
@@ -163,7 +177,7 @@ JSON
   cat > "$TEST_DIR/config.json" <<'JSON'
 { "default_pack": "peon", "volume": 0.3, "enabled": true, "categories": {} }
 JSON
-  run_copilot postToolUse '{"sessionId":"test-123","cwd":"/tmp"}'
+  run_copilot agentStop '{"sessionId":"test-123","cwd":"/tmp"}'
   afplay_was_called
   log_line=$(tail -1 "$TEST_DIR/afplay.log")
   [[ "$log_line" == *"-v 0.3"* ]]
@@ -193,13 +207,13 @@ JSON
 # ============================================================
 
 @test "second Stop within debounce window is suppressed" {
-  run_copilot postToolUse '{"sessionId":"test-123","cwd":"/tmp"}'
+  run_copilot agentStop '{"sessionId":"test-123","cwd":"/tmp"}'
   [ "$COPILOT_EXIT" -eq 0 ]
   count1=$(afplay_call_count)
   [ "$count1" = "1" ]
 
   # Second stop within debounce window should be suppressed
-  run_copilot postToolUse '{"sessionId":"test-123","cwd":"/tmp"}'
+  run_copilot agentStop '{"sessionId":"test-123","cwd":"/tmp"}'
   [ "$COPILOT_EXIT" -eq 0 ]
   count2=$(afplay_call_count)
   [ "$count2" = "1" ]

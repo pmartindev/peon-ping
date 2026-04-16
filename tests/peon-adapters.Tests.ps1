@@ -217,13 +217,22 @@ Describe "Functional: copilot.ps1 event mapping" {
         $json.hook_event_name | Should -Be "SessionStart"
     }
 
-    It "maps postToolUse to Stop" {
+    It "maps agentStop to Stop" {
         $adapter = Join-Path $script:AdaptersDir "copilot.ps1"
-        & powershell -NoProfile -NonInteractive -File $adapter -Event "postToolUse"
+        & powershell -NoProfile -NonInteractive -File $adapter -Event "agentStop"
 
         $json = Get-PeonInputLog $script:testDir
         $json | Should -Not -BeNullOrEmpty
         $json.hook_event_name | Should -Be "Stop"
+    }
+
+    It "maps failed postToolUse to PostToolUseFailure" {
+        $adapter = Join-Path $script:AdaptersDir "copilot.ps1"
+        '{"exitCode":1,"toolName":"bash","message":"failed"}' | & powershell -NoProfile -NonInteractive -File $adapter -Event "postToolUse"
+
+        $json = Get-PeonInputLog $script:testDir
+        $json | Should -Not -BeNullOrEmpty
+        $json.hook_event_name | Should -Be "PostToolUseFailure"
     }
 
     It "maps errorOccurred to PostToolUseFailure" {

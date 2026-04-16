@@ -1,21 +1,22 @@
 # peon-ping adapter for GitHub Copilot (Windows)
 # Translates GitHub Copilot hook events into peon.ps1 stdin JSON
 #
-# Setup: Add to .github/hooks/hooks.json in your repository:
+# Setup: Add to .github/hooks/peon-ping.json in your repository,
+# or let install.ps1 auto-register %USERPROFILE%\.copilot\hooks\peon-ping.json:
 #   {
 #     "version": 1,
 #     "hooks": {
 #       "sessionStart": [
-#         { "type": "command", "command": "powershell -NoProfile -File %USERPROFILE%\\.claude\\hooks\\peon-ping\\adapters\\copilot.ps1 sessionStart" }
+#         { "type": "command", "powershell": "powershell -NoProfile -File %USERPROFILE%\\.claude\\hooks\\peon-ping\\adapters\\copilot.ps1 sessionStart" }
 #       ],
 #       "userPromptSubmitted": [
-#         { "type": "command", "command": "powershell -NoProfile -File %USERPROFILE%\\.claude\\hooks\\peon-ping\\adapters\\copilot.ps1 userPromptSubmitted" }
+#         { "type": "command", "powershell": "powershell -NoProfile -File %USERPROFILE%\\.claude\\hooks\\peon-ping\\adapters\\copilot.ps1 userPromptSubmitted" }
 #       ],
 #       "postToolUse": [
-#         { "type": "command", "command": "powershell -NoProfile -File %USERPROFILE%\\.claude\\hooks\\peon-ping\\adapters\\copilot.ps1 postToolUse" }
+#         { "type": "command", "powershell": "powershell -NoProfile -File %USERPROFILE%\\.claude\\hooks\\peon-ping\\adapters\\copilot.ps1 agentStop" }
 #       ],
 #       "errorOccurred": [
-#         { "type": "command", "command": "powershell -NoProfile -File %USERPROFILE%\\.claude\\hooks\\peon-ping\\adapters\\copilot.ps1 errorOccurred" }
+#         { "type": "command", "powershell": "powershell -NoProfile -File %USERPROFILE%\\.claude\\hooks\\peon-ping\\adapters\\copilot.ps1 errorOccurred" }
 #       ]
 #     }
 #   }
@@ -52,6 +53,23 @@ $cwd = if ($inputJson.cwd) { $inputJson.cwd } else { $PWD.Path }
 
 # Map Copilot hook events to peon.ps1 PascalCase events
 $mapped = $null
+$notificationType = ""
+$permissionMode = if ($inputJson.permission_mode) { [string]$inputJson.permission_mode }
+                  elseif ($inputJson.permissionMode) { [string]$inputJson.permissionMode }
+                  elseif ($inputJson.approvalMode) { [string]$inputJson.approvalMode }
+                  else { "" }
+$toolName = if ($inputJson.tool_name) { [string]$inputJson.tool_name }
+            elseif ($inputJson.toolName) { [string]$inputJson.toolName }
+            elseif ($inputJson.tool) { [string]$inputJson.tool }
+            else { "Bash" }
+if (-not $toolName -or $toolName.ToLower() -in @("bash", "sh", "shell")) {
+    $toolName = "Bash"
+}
+$errorText = if ($inputJson.error) { [string]$inputJson.error }
+             elseif ($inputJson.message) { [string]$inputJson.message }
+             elseif ($inputJson.stderr) { [string]$inputJson.stderr }
+             elseif ($inputJson.failureMessage) { [string]$inputJson.failureMessage }
+             else { "" }
 
 switch ($Event) {
     "sessionStart" {
@@ -77,13 +95,60 @@ switch ($Event) {
             $mapped = "UserPromptSubmit"
         }
     }
+    "agentStop" {
+        $mapped = "Stop"
+    }
+    "subagentStop" {
+        $mapped = "SubagentStop"
+    }
     "preToolUse" {
-        # Before tool execution — skip (too noisy)
-        exit 0
+        # Only surface explicit approval/permission prompts; otherwise preToolUse is too noisy.
+        $hint = @(
+            [string]$inputJson.notification_type,
+            [string]$inputJson.decision,
+            [string]$inputJson.approvalState,
+            $permissionMode
+        ) -join " "
+        if ($hint.ToLower() -match "permission|approval|ask|prompt|review") {
+            $mapped = "Notification"
+            $notificationType = "permission_prompt"
+        } else {
+            exit 0
+        }
     }
     "postToolUse" {
-        # After tool execution — treat as task completion
-        $mapped = "Stop"
+        # Successful postToolUse fires on every tool call; only forward failures.
+        $statusText = if ($inputJson.status) { [string]$inputJson.status }
+                      elseif ($inputJson.result) { [string]$inputJson.result }
+                      else { "" }
+        $exitCode = 0
+        if ($null -ne $inputJson.exitCode -and "$($inputJson.exitCode)" -ne "") {
+            $exitCode = [int]$inputJson.exitCode
+        } elseif ($null -ne $inputJson.exit_code -and "$($inputJson.exit_code)" -ne "") {
+            $exitCode = [int]$inputJson.exit_code
+        } elseif ($null -ne $inputJson.code -and "$($inputJson.code)" -ne "") {
+            $exitCode = [int]$inputJson.code
+        }
+
+        $failed = $false
+        if ($null -ne $inputJson.success) {
+            $failed = -not [bool]$inputJson.success
+        }
+        if ($exitCode -ne 0) {
+            $failed = $true
+        }
+        if ($statusText.ToLower() -match "error|fail|denied|cancel") {
+            $failed = $true
+        }
+        if ($errorText) {
+            $failed = $true
+        }
+
+        if ($failed) {
+            $mapped = "PostToolUseFailure"
+        } else {
+            exit 0
+        }
     }
     "errorOccurred" {
         # Error occurred during session
@@ -98,15 +163,16 @@ switch ($Event) {
 # Build CESP JSON payload
 $payload = @{
     hook_event_name   = $mapped
-    notification_type = ""
+    notification_type = $notificationType
     cwd               = $cwd
     session_id        = $sessionId
-    permission_mode   = ""
+    permission_mode   = $permissionMode
+    source            = "copilot"
 }
 
 if ($mapped -eq "PostToolUseFailure") {
-    $payload["tool_name"] = "Bash"
-    $payload["error"] = "errorOccurred"
+    $payload["tool_name"] = $toolName
+    $payload["error"] = if ($errorText) { $errorText } else { "Copilot event: $Event" }
 }
 
 $payloadJson = $payload | ConvertTo-Json -Compress

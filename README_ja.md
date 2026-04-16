@@ -537,7 +537,7 @@ peon-ping はフックをサポートする任意のエージェント型 IDE �
 | **Claude Code** | 組み込み | `curl \| bash` でインストールすればすべて自動 |
 | **Amp** | アダプター | `bash adapters/amp.sh` / `powershell adapters/amp.ps1`（[セットアップ](#amp-セットアップ)） |
 | **Gemini CLI** | アダプター | `adapters/gemini.sh`（Windows では `.ps1`）を指すフックを追加（[セットアップ](#gemini-cli-セットアップ)） |
-| **GitHub Copilot** | アダプター | `.github/hooks/hooks.json` に `adapters/copilot.sh`（または `.ps1`）を指すフックを追加（[セットアップ](#github-copilot-セットアップ)） |
+| **GitHub Copilot** | アダプター | インストール時に `~/.copilot/hooks/peon-ping.json` を自動登録、または `.github/hooks/` でリポジトリ単位設定（[セットアップ](#github-copilot-セットアップ)） |
 | **OpenAI Codex** | アダプター | まず peon-ping ランタイムをインストールし、`~/.codex/config.toml` に `adapters/codex.sh`（または `.ps1`）を指す `notify` を追加（[セットアップ](#openai-codex-セットアップ)） |
 | **Cursor** | 組み込み | `curl \| bash`、`peon-ping-setup`、または Windows `install.ps1` が自動検出して登録。Windows では **設定 → 機能 → サードパーティスキル** を有効にして、Cursor が `~/.claude/settings.json` を読み込み SessionStart/Stop サウンドを再生するようにしてください。 |
 | **OpenCode** | アダプター | `bash adapters/opencode.sh` / `powershell adapters/opencode.ps1`（[セットアップ](#opencode-セットアップ)） |
@@ -624,64 +624,46 @@ Homebrew でインストールした場合、ランタイムファイルは `~/.
 
 ### GitHub Copilot セットアップ
 
-[GitHub Copilot](https://github.com/features/copilot) 用のシェルアダプター。[CESP v1.0](https://github.com/PeonPing/openpeon) に完全準拠。
+[GitHub Copilot](https://github.com/features/copilot) / Copilot CLI 用のフックアダプター。[CESP v1.0](https://github.com/PeonPing/openpeon) に完全準拠しています。
 
-**セットアップ：**
+**推奨セットアップ：**
 
-1. peon-ping がインストール済みであることを確認（`curl -fsSL https://peonping.com/install | bash`）
+1. peon-ping をインストール：
 
-2. リポジトリのデフォルトブランチに `.github/hooks/hooks.json` を作成：
-
-   ```json
-   {
-     "version": 1,
-     "hooks": {
-       "sessionStart": [
-         {
-           "type": "command",
-           "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh sessionStart"
-         }
-       ],
-       "userPromptSubmitted": [
-         {
-           "type": "command",
-           "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh userPromptSubmitted"
-         }
-       ],
-       "postToolUse": [
-         {
-           "type": "command",
-           "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh postToolUse"
-         }
-       ],
-       "errorOccurred": [
-         {
-           "type": "command",
-           "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh errorOccurred"
-         }
-       ]
-     }
-   }
+   ```bash
+   curl -fsSL https://peonping.com/install | bash
    ```
 
-3. コミットしてデフォルトブランチにマージ。次の Copilot エージェントセッションでフックが有効になります。
+2. Copilot CLI が既にインストールされていて `~/.copilot/` が存在する場合、インストーラーは次を自動作成します：
+
+   ```text
+   ~/.copilot/hooks/peon-ping.json
+   ```
+
+3. Copilot CLI を再起動して新しいセッションを開始。
+
+**手動のリポジトリ設定（公式 hooks パス）：**
+
+`.github/hooks/peon-ping.json` をデフォルトブランチにコミットすることもできます。`sessionStart`、`userPromptSubmitted`、`preToolUse`、`postToolUse`、`agentStop`、`subagentStop`、`errorOccurred` を `adapters/copilot.sh`（Windows は `.ps1`）に向けてください。
 
 **イベントマッピング：**
 
-- `sessionStart` → 挨拶サウンド（*"Ready to work?"*、*"Yes?"*）
-- `userPromptSubmitted` → 最初のプロンプト = 挨拶、以降 = スパム検出
-- `postToolUse` → 完了サウンド（*"Work, work."*、*"Job's done!"*）
-- `errorOccurred` → エラーサウンド（*"I can't do that."*）
-- `preToolUse` → スキップ（ノイズが多すぎるため）
-- `sessionEnd` → サウンドなし（session.end は未実装）
+- `sessionStart` → 挨拶サウンド
+- `userPromptSubmitted` → 最初のプロンプトは挨拶、以降はスパム検出
+- `agentStop` → 完了サウンド
+- `subagentStop` → サブエージェント完了処理
+- `postToolUse` → ツール失敗時のみエラー音を再生
+- `errorOccurred` → エラーサウンド
+- `preToolUse` → 明示的な権限プロンプト以外はスキップ
+- `sessionEnd` → サウンドなし
 
 **機能：**
 
-- **サウンド再生** — `afplay`（macOS）、`pw-play`/`paplay`/`ffplay`（Linux）経由 — シェルフックと同じ優先チェーン
-- **CESP イベントマッピング** — GitHub Copilot フックが標準 CESP カテゴリ（`session.start`、`task.complete`、`task.error`、`user.spam`）にマッピング
-- **デスクトップ通知** — デフォルトで大型オーバーレイバナー、または標準通知
-- **スパム検出** — 10秒以内の3回以上の高速プロンプトを検出し、`user.spam` ボイスラインをトリガー
-- **セッション追跡** — Copilot sessionId ごとに独立したセッションマーカー
+- **`jq` 不要** — 他のシェルアダプターと同様に埋め込み `python3` で JSON を解析
+- **CESP イベントマッピング** — Copilot フックを `session.start`、`task.complete`、`task.error`、`user.spam` にマッピング
+- **デスクトップ通知**
+- **スパム検出**
+- **セッション追跡** — Copilot `sessionId` ごとに独立したセッションマーカー
 
 ### OpenCode セットアップ
 
